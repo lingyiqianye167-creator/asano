@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>粋過ぎルーレット</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      height: 100%; width: 100%;
+      font-family: 'Rounded Mplus 1c', 'Arial Rounded MT Bold', 'Hiragino Maru Gothic Pro', sans-serif;
+      overflow: hidden;
+      background-image: url("maxresdefault.jpg");
+      background-size: 200px 112px;
+      background-repeat: repeat;
+      background-position: center;
+      position: relative;
+      color: white;
+    }
+
+    .title {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 3em;
+      color: white;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+      background: rgba(0, 0, 0, 0.3);
+      padding: 10px 20px;
+      border-radius: 20px;
+      white-space: nowrap;
+      z-index: 10;
+    }
+
+    canvas {
+      position: absolute;
+      top: 55%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      opacity: 1;
+      z-index: 1;
+      border-radius: 50%;
+      box-shadow: 0 0 15px rgba(0,0,0,0.7);
+      background: rgba(0,0,0,0.6);
+      width: 360px;
+      height: 360px;
+    }
+
+    .controls {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      z-index: 10;
+    }
+
+    input[type="text"] {
+      padding: 10px;
+      border-radius: 10px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      font-size: 1em;
+      width: 180px;
+      color: #fff;
+      font-weight: bold;
+      background: rgba(0, 0, 0, 0.3);
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 1em;
+      border-radius: 10px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      background: rgba(0, 0, 0, 0.3);
+      color: #fff;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background-color 0.3s ease, border-color 0.3s ease;
+    }
+
+    button:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.5);
+      color: #fff;
+    }
+
+    .winners-container {
+      position: absolute;
+      top: 100px;
+      bottom: 100px;
+      width: 20%;
+      overflow-y: auto;
+      padding: 10px 20px;
+      border-radius: 15px;
+      background: rgba(0, 0, 0, 0.3);
+      box-shadow: 0 0 10px rgba(0,0,0,0.6);
+      font-weight: bold;
+      font-size: 1.1em;
+      line-height: 1.6em;
+      z-index: 10;
+      color: white;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .winners-left { left: 20px; }
+    .winners-right { right: 20px; }
+
+    .winners-container h2 {
+      margin-top: 0;
+      text-align: center;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+      color: white;
+    }
+
+    .winner-name {
+      padding: 5px 10px;
+      margin: 4px 0;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.2);
+      box-shadow: inset 0 0 5px rgba(0,0,0,0.1);
+      cursor: default;
+      user-select: none;
+      transition: background-color 0.3s ease;
+      color: black;
+    }
+
+    .winner-name:hover {
+      background-color: rgba(255,255,255,0.4);
+      color: black;
+    }
+  </style>
+</head>
+<body>
+  <div class="title">粋過ぎルーレット</div>
+  <canvas id="wheelCanvas" width="360" height="360"></canvas>
+
+  <div class="controls">
+    <input type="text" id="nameInput" placeholder="名前を入力" />
+    <button onclick="addName()">追加</button>
+    <button onclick="spinWheel()">回す</button>
+  </div>
+
+  <div class="winners-container winners-left">
+    <h2>左側 当選者</h2>
+    <div id="leftWinners"></div>
+  </div>
+
+  <div class="winners-container winners-right">
+    <h2>右側 当選者</h2>
+    <div id="rightWinners"></div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('wheelCanvas');
+    const ctx = canvas.getContext('2d');
+    let names = [];
+    let angle = 0;
+    let spinning = false;
+    let spinSpeed = 0;
+
+    const leftWinners = [];
+    const rightWinners = [];
+
+    const leftWinnersDiv = document.getElementById('leftWinners');
+    const rightWinnersDiv = document.getElementById('rightWinners');
+
+    // === 🎵 音声リスト ===
+    const sounds = [
+      "sounds/（ほんと）氣持ちいいわ〜.mp3",
+      "sounds/なんだよじゃあ俺がたたしてやるか.mp3",
+      "sounds/しょうがねぇなぁ・・・.mp3",
+      "sounds/ふぅーあー.mp3",
+      "sounds/もっとしかっ・・・志多使ってくださいよぉ.mp3",
+      "sounds/もっと志多使って志多使ってほらぁ.mp3",
+      "sounds/奥までほらほら.mp3",
+      "sounds/何であんなんきついんすかね〜も〜.mp3",
+      "sounds/嬉しいだろぉ〜？.mp3",
+      "sounds/手！手！手！(手どけ？).mp3",
+      "sounds/先輩↓氣持ちいいっすか？.mp3",
+      "sounds/多分冷えてますよぉ.mp3",
+      "sounds/野獣「あああああ」.mp3",
+      "sounds/野獣「あっお前さKMRさぁ、さっきぬっ月兑ぎ終わった時にさ、なかなか出てこなかったよな？」.mp3",
+      "sounds/野獣「いきますよ～、いきますよ～生ク生ク」.mp3",
+      "sounds/野獣「オォン！アォン！」.mp3",
+      "sounds/野獣「こ↑こ↓」.mp3",
+      "sounds/野獣「チュパラッチ」.mp3",
+      "sounds/野獣「で、出ますよ」.mp3",
+      "sounds/野獣「ヌッ！」.mp3",
+      "sounds/野獣「ファ！？」.mp3",
+      "sounds/野獣「ファッ！？ウーン（心肺停止）」.mp3",
+      "sounds/野獣「ブッチッパ」.mp3",
+      "sounds/野獣「ま、多少はね？」.mp3",
+      "sounds/野獣「やりますねえ」.mp3",
+      "sounds/野獣「入って、どうぞ」.mp3",
+      "sounds/野獣「白菜かけますね」.mp3",
+      "sounds/野獣「良いのかぁ？(さらなる高みへ)」.mp3"
+      
+    ];
+
+    // === ランダム再生関数 ===
+    function playRandomSound() {
+      const randomIndex = Math.floor(Math.random() * sounds.length);
+      const sound = new Audio(sounds[randomIndex]);
+      sound.volume = 0.8;
+      sound.play();
+    }
+
+    // === ルーレット描画 ===
+    function drawWheel() {
+      const radius = canvas.width / 2 - 20;
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (names.length === 0) {
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fill();
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = 'white';
+        ctx.stroke();
+        return;
+      }
+
+      const sliceAngle = 2 * Math.PI / names.length;
+
+      for (let i = 0; i < names.length; i++) {
+        const startAngle = angle + i * sliceAngle;
+        const endAngle = startAngle + sliceAngle;
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.lineTo(centerX + radius * Math.cos(startAngle), centerY + radius * Math.sin(startAngle));
+        ctx.strokeStyle = 'rgba(0, 0, 0, 1)';
+        ctx.lineWidth = 8;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.lineTo(centerX + (radius - 5) * Math.cos(startAngle), centerY + (radius - 5) * Math.sin(startAngle));
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(startAngle + sliceAngle / 2);
+        ctx.textAlign = "right";
+        ctx.fillStyle = "white";
+        ctx.font = "bold 22px sans-serif";
+        ctx.shadowColor = 'rgba(0,0,0,0.95)';
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetX = 3;
+        ctx.shadowOffsetY = 3;
+        ctx.fillText(names[i], radius - 25, 6);
+        ctx.restore();
+      }
+
+      // 中心とポインタ
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 30, 0, 2 * Math.PI);
+      ctx.fillStyle = "#222";
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY - radius + 10);
+      ctx.lineTo(centerX - 18, centerY - radius + 30);
+      ctx.lineTo(centerX + 18, centerY - radius + 30);
+      ctx.closePath();
+      ctx.fillStyle = "#ff3333";
+      ctx.fill();
+    }
+
+    function addName() {
+      const input = document.getElementById('nameInput');
+      const name = input.value.trim();
+      if (name) {
+        names.push(name);
+        input.value = '';
+        drawWheel();
+      }
+    }
+
+    function spinWheel() {
+      if (spinning) return;
+      if (names.length === 0) {
+        alert('名前を1人以上追加してください');
+        return;
+      }
+
+      // 回転時にランダム音再生
+      playRandomSound();
+
+      spinning = true;
+      spinSpeed = Math.random() * 0.3 + 0.3;
+      requestAnimationFrame(rotateWheel);
+    }
+
+    function rotateWheel() {
+      if (spinSpeed > 0.002) {
+        angle += spinSpeed;
+        angle %= 2 * Math.PI;
+        spinSpeed *= 0.985;
+        drawWheel();
+        requestAnimationFrame(rotateWheel);
+      } else {
+        spinning = false;
+        announceWinner();
+      }
+    }
+
+    function announceWinner() {
+      const sliceAngle = 2 * Math.PI / names.length;
+      const normalizedAngle = (2 * Math.PI - angle + sliceAngle / 2) % (2 * Math.PI);
+      const winnerIndex = Math.floor(normalizedAngle / sliceAngle);
+      const winner = names[winnerIndex];
+      if (!winner) {
+        alert("エラー：当選者が見つかりません");
+        return;
+      }
+
+      // 当選時も音を再生
+      playRandomSound();
+
+      names.splice(winnerIndex, 1);
+      if (Math.random() < 0.5) {
+        leftWinners.push(winner);
+        updateWinnersList('left');
+      } else {
+        rightWinners.push(winner);
+        updateWinnersList('right');
+      }
+      alert(`🎉 当選者: ${winner}`);
+      drawWheel();
+    }
+
+    function updateWinnersList(side) {
+      const target = side === 'left' ? leftWinnersDiv : rightWinnersDiv;
+      const winners = side === 'left' ? leftWinners : rightWinners;
+      target.innerHTML = '';
+      winners.forEach(name => {
+        const div = document.createElement('div');
+        div.className = 'winner-name';
+        div.textContent = name;
+        target.appendChild(div);
+      });
+    }
+
+    drawWheel();
+  </script>
+</body>
+</html>
